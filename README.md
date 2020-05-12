@@ -1,6 +1,6 @@
 # Fork of Sqlite3Worker
 
-Sqlite3Worker is a threadsafe sqlite worker.
+Sqlite3Worker is a threadsafe sqlite worker.  
 In this fork we added the possibility to retrieve the columns' names (heading) from the query by using the "execute_with_columns" method instead of the "execute" one.  
 To do it you can use the following structure:  
     ```
