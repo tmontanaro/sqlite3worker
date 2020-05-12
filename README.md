@@ -1,8 +1,13 @@
-# Sqlite3Worker
+# Fork of Sqlite3Worker
 
-A threadsafe sqlite worker.
+Sqlite3Worker is a threadsafe sqlite worker.
+In this fork we added the possibility to retrieve the columns' names (heading) from the query by using the "execute_with_columns" method instead of the "execute" one.  
+To do it you can use the following structure:  
+    ```
+    rows, columns = sql_worker.execute_with_columns("SELECT * from tester")
+    ```
 
-This library implements a thread pool pattern with sqlite3 being the desired
+This library (thanks to the one from which it was forked) implements a thread pool pattern with sqlite3 being the desired
 output.
 
 sqllite3 implementation lacks the ability to safely modify the sqlite3 database
