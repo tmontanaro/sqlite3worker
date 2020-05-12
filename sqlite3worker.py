@@ -18,10 +18,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Teodoro Montanaro only added the "execute_with_columns" and "query_results_with_columns" methods
+# So now, by using "execute_with_columns" method instead of "execute" it is possible to obtain as a result of the select query the following structure: (rows, columns)
+
 """Thread safe sqlite3 interface."""
 
-__author__ = "Shawn Lee"
-__email__ = "shawnl@palantir.com"
+__author__ = "Shawn Lee, Teodoro Montanaro"
+__email__ = "shawnl@palantir.com, teodoro.montanaro@linksfoundation.com"
 __license__ = "MIT"
 
 import logging
@@ -67,6 +70,7 @@ class Sqlite3Worker(threading.Thread):
         self.sqlite3_cursor = self.sqlite3_conn.cursor()
         self.sql_queue = Queue.Queue(maxsize=max_queue_size)
         self.results = {}
+        self.columns = {}
         self.max_queue_size = max_queue_size
         self.exit_set = False
         # Token that is put into queue when close() is called.
@@ -128,6 +132,10 @@ class Sqlite3Worker(threading.Thread):
                     "Query returned error: %s: %s: %s" % (query, values, err))
                 LOGGER.error(
                     "Query returned error: %s: %s: %s", query, values, err)
+            try:
+                self.columns[token] = list(map(lambda x: x[0], self.sqlite3_cursor.description))
+            except:
+                LOGGER.error("It was not possible to retrieve columns' names")
         else:
             try:
                 self.sqlite3_cursor.execute(query, values)
@@ -171,6 +179,31 @@ class Sqlite3Worker(threading.Thread):
             if delay < 8:
                 delay += delay
 
+    def query_results_with_columns(self, token):
+        """Get the query results for a specific token.
+
+        Args:
+            token: A uuid object of the query you want returned.
+
+        Returns:
+            Return the results of the query when it's executed by the thread.
+        """
+        delay = .001
+        while True:
+            if token in self.results:
+                return_val = self.results[token]
+                return_col = self.columns[token]
+                del self.results[token]
+                del self.columns[token]
+                return (return_val, return_col)
+            # Double back on the delay to a max of 8 seconds.  This prevents
+            # a long lived select statement from trashing the CPU with this
+            # infinite loop as it's waiting for the query results.
+            LOGGER.debug("Sleeping: %s %s", delay, token)
+            time.sleep(delay)
+            if delay < 8:
+                delay += delay
+
     def execute(self, query, values=None):
         """Execute a query.
 
@@ -193,5 +226,30 @@ class Sqlite3Worker(threading.Thread):
         if query.lower().strip().startswith("select"):
             self.sql_queue.put((token, query, values), timeout=5)
             return self.query_results(token)
+        else:
+            self.sql_queue.put((token, query, values), timeout=5)
+
+    def execute_with_columns(self, query, values=None):
+        """Execute a query.
+
+        Args:
+            query: The sql string using ? for placeholders of dynamic values.
+            values: A tuple of values to be replaced into the ? of the query.
+
+        Returns:
+            If it's a select query it will return the results of the query.
+        """
+        if self.exit_set:
+            LOGGER.debug("Exit set, not running: %s", query)
+            return "Exit Called"
+        LOGGER.debug("execute: %s", query)
+        values = values or []
+        # A token to track this query with.
+        token = str(uuid.uuid4())
+        # If it's a select we queue it up with a token to mark the results
+        # into the output queue so we know what results are ours.
+        if query.lower().strip().startswith("select"):
+            self.sql_queue.put((token, query, values), timeout=5)
+            return self.query_results_with_columns(token)
         else:
             self.sql_queue.put((token, query, values), timeout=5)

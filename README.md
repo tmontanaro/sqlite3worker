@@ -17,19 +17,6 @@ Installation is via the usual ``setup.py`` method:
 sudo python setup.py install
 ```
 
-Alternatively one can use ``pip`` to install directly from the git repository
-without having to clone first:
-
-```sh
-sudo pip install git+https://github.com/palantir/sqlite3worker#egg=sqlite3worker
-```
-
-One may also use ``pip`` to install on a per-user basis without requiring
-super-user permissions:
-
-```sh
-pip install --user git+https://github.com/palantir/sqlite3worker#egg=sqlite3worker
-```
 
 ## Example
 ```python
@@ -41,6 +28,10 @@ sql_worker.execute("INSERT into tester values (?, ?)", ("2010-01-01 13:00:00", "
 sql_worker.execute("INSERT into tester values (?, ?)", ("2011-02-02 14:14:14", "dog"))
 
 results = sql_worker.execute("SELECT * from tester")
+for timestamp, uuid in results:
+    print(timestamp, uuid)
+
+results, columns = sql_worker.execute_with_columns("SELECT * from tester")
 for timestamp, uuid in results:
     print(timestamp, uuid)
 
